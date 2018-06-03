@@ -1,0 +1,8 @@
+bin/
+cov/
+cov.info
+*.gcov
+notes/
+obj/
+vgcore.*
+
