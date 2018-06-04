@@ -28,24 +28,13 @@ void init_geometry_556(ApproxCons *self){
 }
 
 int main(){
-	ConsVec candidates = {malloc(4096*4*sizeof(ConsStep)), 0, 4096, 4};
-	if(!candidates.constructions){
-		fprintf(stderr, "\e[1;31mERROR: Could not allocate candidate solution buffer.\e[0m\n");
-		exit(1);
-	}
 	ApproxCons base;
 	init_geometry_556(&base);
-	dfs_cons(&base, &candidates, 5);
-	printf("Found %d 5-step constructions for the interior Appolonian circle of an isosceles set:\n", candidates.len);
-	for(int i = 0; i < candidates.len; ++i){
-		const ConsStep *cons = candidates.constructions + i*candidates.depth;
-		printf(" %5d: %2d %2d %s\n", i, cons[0].i, cons[0].j,
-			cons[0].type == GEOM_LINE ? "line" : "circle");
-		for(int j = 1; j < 4; ++j){
-			printf("      : %2d %2d %s\n", cons[j].i, cons[j].j,
-				cons[j].type == GEOM_LINE ? "line" : "circle");
-		}
-	}
-	free(candidates.constructions);
+	apply_construction(&base, 4, &(ConsStep[]){
+		{0, 1, GEOM_LINE},
+		{2, 3, GEOM_LINE},
+		{8, 4, GEOM_CIRCLE},
+		{0, 11, GEOM_LINE},
+	});
 }
 

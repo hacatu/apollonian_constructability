@@ -54,7 +54,7 @@ int intersect_CL(ApproxCons *self, const Circle *restrict C, const Line *restric
 		self->points[self->points_len++] = (Point){C->x + ox, C->y + oy};
 		return 1;
 	}//otherwise there are two intersections
-	double h = sqrt(C->r*C->r - a*a)/a;
+	double h = a < EPSILON ? C->r : sqrt(C->r*C->r - a*a)/a;
 	double dx = h*oy;
 	double dy = h*ox;
 	ox += C->x;
@@ -128,21 +128,6 @@ int intersect_CL(ApproxCons *self, const Circle *restrict C, const Line *restric
  * we will find very few valid configurations if we find any at all so looking at this record is not something that will
  * frequently happen, it just has to be possible.
  */
-
-void init_geometry_345(ApproxCons *self){
-	static const Point init_points[] = {{0, 8}, {0, 5}, {-1, 0}, {0, 0}, {1, 0}, {5, 0}, {0, -1}, {1.8, 1.6}};
-	memcpy(self->points, init_points, sizeof(init_points));
-	self->points_len = LENGTHOF(init_points);
-	static const Line init_lines[] = {{0, 0, 0, 1}, {0, 0, 1, 0}};
-	memcpy(self->lines, init_lines, sizeof(init_lines));
-	self->lines_len = LENGTHOF(init_lines);
-	static const Circle init_circles[] = {{0, 0, 1}, {3, 0, 2}, {0, 5, 3}};
-	memcpy(self->circles, init_circles, sizeof(init_circles));
-	self->circles_len = LENGTHOF(init_circles);
-	self->steps_len = 0;
-	//initialize self->goal;
-	self->goal = (Circle){21/23., 20/23., 6/23.};
-}
 
 int eq_lines(const Line *restrict a, const Line *restrict b){
 	if(fabs(a->dx*b->dx + a->dy*b->dy) < 1 - EPSILON){
@@ -218,7 +203,7 @@ void remove_duplicate_points(ApproxCons *self, int prev_len){
 				if(j == self->points_len - 1){
 					self->points_len = j;
 				}else{
-					self->points[j] = self->points[--self->points_len];
+					self->points[j--] = self->points[--self->points_len];
 				}
 			}
 		}
@@ -231,7 +216,7 @@ void remove_duplicate_points(ApproxCons *self, int prev_len){
 				if(j == self->points_len - 1){
 					self->points_len = j;
 				}else{
-					self->points[j] = self->points[--self->points_len];
+					self->points[j--] = self->points[--self->points_len];
 				}
 			}
 		}

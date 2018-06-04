@@ -46,8 +46,6 @@ int intersect_LL(ApproxCons *self, const Line *restrict a, const Line *restrict 
 int intersect_CC(ApproxCons *self, const Circle *restrict a, const Circle *restrict b);
 int intersect_CL(ApproxCons *self, const Circle *restrict C, const Line *restrict L);
 
-void init_geometry_345(ApproxCons *self);
-
 int eq_lines(const Line *restrict a, const Line *restrict b);
 int eq_circles(const Circle *restrict a, const Circle *restrict b);
 int eq_points(const Point *restrict a, const Point *restrict b);
