@@ -4,28 +4,8 @@
 #include <math.h>
 #include "geometry.h"
 #include "dfs.h"
-
-void init_geometry_222(ApproxCons *self){
-	static const Point init_points[] = {
-		{-.5, 7/sqrt(12)}, {-.5, 7/sqrt(12)},
-		{0, 2/sqrt(3)}, {0, -1/sqrt(3)},
-		{-.5, 1/sqrt(12)}, {.5, 1/sqrt(12)},
-		{-1, -1/sqrt(3)}, {1, -1/sqrt(3)},
-		{-1.5, -5/sqrt(12)}, {1.5, -5/sqrt(12)}};
-	memcpy(self->points, init_points, sizeof(init_points));
-	self->points_len = LENGTHOF(init_points);
-	static const Line init_lines[] = {
-		{0, 1, 1./2, sqrt(3)/2}, {0, 1, -1./2, sqrt(3)/2}};
-	memcpy(self->lines, init_lines, sizeof(init_lines));
-	self->lines_len = LENGTHOF(init_lines);
-	static const Circle init_circles[] = {
-		{0, 2/sqrt(3), 1}, {-1, -1/sqrt(3), 1}, {1, -1/sqrt(3), 1}};
-	memcpy(self->circles, init_circles, sizeof(init_circles));
-	self->circles_len = LENGTHOF(init_circles);
-	self->steps_len = 0;
-	//initialize self->goal;
-	self->goal = (Circle){0, 0, 2/sqrt(3) - 1};
-}
+#include "construction.h"
+#include "init_geometry.h"
 
 int main(){
 	ConsVec candidates = {malloc(4096*2*sizeof(ConsStep)), 0, 4096, 2};
@@ -35,7 +15,7 @@ int main(){
 	}
 	ApproxCons base;
 	init_geometry_222(&base);
-	dfs_cons(&base, &candidates, 3);
+	dfs_cons(&base, record_construction_cb, &candidates, 3);
 	printf("Found %d 3-step constructions for the interior Appolonian circle of an equilateral set:\n", candidates.len);
 	for(int i = 0; i < candidates.len; ++i){
 		const ConsStep *cons = candidates.constructions + i*candidates.depth;

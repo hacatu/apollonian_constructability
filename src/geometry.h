@@ -1,6 +1,11 @@
 #ifndef _GEOMETRY_H__
 #define _GEOMETRY_H__
 
+#define MAX_CONS_STEPS 6
+#define MAX_CONS_LINES 8
+#define MAX_CONS_CIRCLES 9
+#define MAX_CONS_POINTS 100
+
 #define LENGTHOF(a) (sizeof(a)/sizeof(*a))
 
 #define EPSILON 0.0000005
@@ -34,10 +39,10 @@ typedef struct{
 } ConsVec;
 
 typedef struct{
-	Point points[100];
-	Line lines[8];
-	Circle circles[9];
-	ConsStep steps[6];
+	Point points[MAX_CONS_POINTS];
+	Line lines[MAX_CONS_LINES];
+	Circle circles[MAX_CONS_CIRCLES];
+	ConsStep steps[MAX_CONS_STEPS];
 	int points_len, lines_len, circles_len, steps_len;
 	Circle goal;
 } ApproxCons;

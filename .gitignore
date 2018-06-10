@@ -6,4 +6,5 @@ notes/
 obj/
 vgcore.*
 *.log
+*.dat
 
