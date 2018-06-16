@@ -7,4 +7,5 @@ obj/
 vgcore.*
 *.log
 *.dat
+*.bak
 

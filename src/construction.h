@@ -37,7 +37,9 @@ int apply_xcons(ApproxCons *base, const XCons *steps);
 int record_construction_cb(const ApproxCons *base, void *data);
 
 int init_write_cb_data(Write_cb_data *self, const char *name);
+int write_xcons(int fd, const XCons *self);
 int write_cb(const ApproxCons *approx, void *data);
+XCons *read_file(int fd, size_t *_len);
 void *print_candidates(void *data);
 
 #endif

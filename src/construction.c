@@ -44,35 +44,84 @@ int apply_construction(ApproxCons *base, int steps_len, const ConsStep steps[sta
 }
 
 int apply_xcons(ApproxCons *base, const XCons *steps){
+	ApproxCons pbuf;
 	for(int i = 0; i < steps->len; ++i){
-		int last_len = base->points_len;
+		int last_len = base->points_len, n = 0;
 		Line l;
 		Circle c;
-		if(steps->construction[i].i1 >= last_len || steps->construction[i].i2 >= last_len){
+		const XConsStep *step = steps->construction + i;
+		int i1 = step->i1, i2 = step->i2, o1 = step->o1, o2 = step->o2, type = step->type;
+		if(i1 >= last_len || i2 >= last_len){
 			return 0;
 		}
-		switch(steps->construction[i].type){
+		switch(type){
 		case GEOM_DEP_PPL:
-			construct_line(&l, base->points + steps->construction[i].i1, base->points + steps->construction[i].i2);
-			if(!add_line_single(base, &l)){
-				return 0;
+			construct_line(&l, base->points + i1, base->points + i2);
+			base->lines[o1] = l;
+			if(o1 + 1 > base->lines_len){
+				base->lines_len = o1 + 1;
 			}
 			break;
 		case GEOM_DEP_PPC:
-			construct_circle(&c, base->points + steps->construction[i].i1, base->points + steps->construction[i].i2);
-			if(!add_circle_single(base, &c)){
+			construct_circle(&c, base->points + i1, base->points + i2);
+			base->circles[o1] = c;
+			if(o1 + 1 > base->circles_len){
+				base->circles_len = o1 + 1;
+			}
+			break;
+		case GEOM_DEP_LLP:
+			pbuf.points_len = 0;
+			if(!intersect_LL(&pbuf, base->lines + i1, base->lines + i2)){
 				return 0;
+			}
+			base->points[o1] = pbuf.points[0];
+			if(o1 + 1 > base->points_len){
+				base->points_len = o1 + 1;
+			}
+			break;
+		case GEOM_DEP_CLP:
+			pbuf.points_len = 0;
+			n = intersect_CL(&pbuf, base->circles + i1, base->lines + i2);
+			if((o2 != -1 && n != 2) || !n){
+				return 0;
+			}
+			if(o1 != -1){
+				base->points[o1] = pbuf.points[0];
+				if(o1 + 1 > base->points_len){
+					base->points_len = o1 + 1;
+				}
+			}
+			if(o2 != -1){
+				base->points[o2] = pbuf.points[1];
+				if(o2 + 1 > base->points_len){
+					base->points_len = o2 + 1;
+				}
+			}
+			break;
+		case GEOM_DEP_CCP:
+			pbuf.points_len = 0;
+			n = intersect_CC(&pbuf, base->circles + i1, base->circles + i2);
+			if((o2 != -1 && n != 2) || !n){
+				return 0;
+			}
+			if(o1 != -1){
+				base->points[o1] = pbuf.points[0];
+				if(o1 + 1 > base->points_len){
+					base->points_len = o1 + 1;
+				}
+			}
+			if(o2 != -1){
+				base->points[o2] = pbuf.points[1];
+				if(o2 + 1 > base->points_len){
+					base->points_len = o2 + 1;
+				}
 			}
 			break;
 		case GEOM_DEP_COUNT:
 			return 1;
 		default:
 			return 0;
-		case GEOM_DEP_LLP:
-		case GEOM_DEP_CLP:
-		case GEOM_DEP_CCP:;
 		}
-		remove_duplicate_points(base, last_len);
 	}
 	return 1;
 }
@@ -237,26 +286,19 @@ int init_write_cb_data(Write_cb_data *self, const char *name){
 	return fds[0];
 	*/
 	self->fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-	if(!self->fd){
-		return 0;
-	}
-	return 1;
+	return self->fd != -1;
 }
 
-int write_cb(const ApproxCons *approx, void *data){
-	XCons out;
-	out.len = 0;
-	ApproxCons base = ((const Write_cb_data*)data)->base;
-	export_construction(&out, &base, approx->steps_len, approx->steps);
-	void *buf = &out;
-	size_t nbyte = offsetof(XCons, construction) + out.len*sizeof(XConsStep);
+int write_xcons(int fd, const XCons *self){
+	const void *buf = self;
+	size_t nbyte = offsetof(XCons, construction) + self->len*sizeof(XConsStep);
 	while(nbyte){
-		ssize_t len = write(((const Write_cb_data*)data)->fd, buf, nbyte);
+		ssize_t len = write(fd, buf, nbyte);
 		while(len == -1){
 			switch(errno){
 			case EINTR:
 			case EAGAIN:
-				len = write(((const Write_cb_data*)data)->fd, buf, nbyte);
+				len = write(fd, buf, nbyte);
 				continue;
 			default:
 				return 0;
@@ -266,6 +308,78 @@ int write_cb(const ApproxCons *approx, void *data){
 		buf += len;
 	}
 	return 1;
+}
+
+int write_cb(const ApproxCons *approx, void *data){
+	XCons out;
+	out.len = 0;
+	ApproxCons base = ((const Write_cb_data*)data)->base;
+	export_construction(&out, &base, approx->steps_len, approx->steps);
+	return write_xcons(((const Write_cb_data*)data)->fd, &out);
+}
+
+XCons *read_file(int fd, size_t *_len){
+	size_t len = 0, cap = 1024;
+	XCons *candidates = malloc(cap*sizeof(XCons));
+	if(!candidates){
+		return NULL;
+	}
+	for(int n = 1;; ++n){
+		XCons construction;
+		void *buf = &construction;
+		for(size_t nbyte = offsetof(XCons, construction); nbyte;){
+			ssize_t len = read(fd, buf, nbyte);
+			while(len == -1){
+				switch(errno){
+				case EINTR:
+				case EAGAIN:
+					len = read(fd, buf, nbyte);
+					continue;
+				default:
+					free(candidates);
+					return NULL;
+				}
+			}
+			if(!len){
+				candidates = realloc(candidates, n*sizeof(XCons)) ?: candidates;
+				*_len = n;
+				return candidates;
+			}
+			nbyte -= len;
+			buf += len;
+		}
+		for(size_t nbyte = construction.len*sizeof(XConsStep); nbyte;){
+			ssize_t len = read(fd, buf, nbyte);
+			while(len == -1){
+				switch(errno){
+				case EINTR:
+				case EAGAIN:
+					len = read(fd, buf, nbyte);
+					continue;
+				default:
+					free(candidates);
+					return NULL;
+				}
+			}
+			if(!len){
+				free(candidates);
+				return NULL;
+			}
+			nbyte -= len;
+			buf += len;
+		}
+		if(len == cap){
+			size_t new_cap = cap << 1;
+			XCons *tmp = realloc(candidates, new_cap*sizeof(XCons));
+			if(!tmp){
+				free(candidates);
+				return NULL;
+			}
+			candidates = tmp;
+			cap = new_cap;
+		}
+		candidates[len++] = construction;
+	}
 }
 
 void *print_candidates(void *data){

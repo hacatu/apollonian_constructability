@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 #include "geometry.h"
 #include "dfs.h"
 #include "construction.h"
@@ -17,7 +18,5 @@ int main(){
 	ApproxCons base = cb_data.base;
 	dfs_cons(&base, write_cb, &cb_data, 6);
 	close(cb_data.fd);
-	//now we need to check candidates more carefully.
-	//We can also do that as we find them which I might do
 }
 
