@@ -188,8 +188,8 @@ int main(void){
 	}
 	printf("Loaded %zu candidates\n", len);
 	ApproxCons base = {};
-	//init_geometry_345(&base);
-	init_geometry_scalene_lt120(&base, 40, 13, 37);
+	init_geometry_345(&base);
+	//init_geometry_scalene_lt120(&base, 40, 13, 37);
 	if(!apply_xcons(&base, candidates)){
 		printf("Could not apply construction.\n");
 		base = (ApproxCons){};
@@ -250,8 +250,8 @@ int main(void){
 				}
 				}
 				base = (ApproxCons){};
-				//init_geometry_345(&base);
-				init_geometry_scalene_lt120(&base, 40, 13, 37);
+				init_geometry_345(&base);
+				//init_geometry_scalene_lt120(&base, 40, 13, 37);
 				if(!apply_xcons(&base, candidates + i)){
 					printf("Could not apply construction.\n");
 					base = (ApproxCons){};
