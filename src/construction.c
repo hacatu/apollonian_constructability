@@ -3,11 +3,12 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include <string.h>
-#include <math.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <mpfr.h>
+#include <mpfi.h>
 #include "geometry.h"
 #include "construction.h"
 
@@ -21,13 +22,13 @@ int apply_construction(ApproxCons *base, int steps_len, const ConsStep steps[sta
 		}
 		switch(steps[i].type){
 		case GEOM_LINE:
-			construct_line(&l, base->points + steps[i].i, base->points + steps[i].j);
+			construct_line(base, &l, base->points + steps[i].i, base->points + steps[i].j);
 			if(!add_line_single(base, &l)){
 				return 0;
 			}
 			break;
 		case GEOM_CIRCLE:
-			construct_circle(&c, base->points + steps[i].i, base->points + steps[i].j);
+			construct_circle(base, &c, base->points + steps[i].i, base->points + steps[i].j);
 			if(!add_circle_single(base, &c)){
 				return 0;
 			}
@@ -45,6 +46,7 @@ int apply_construction(ApproxCons *base, int steps_len, const ConsStep steps[sta
 
 int apply_xcons(ApproxCons *base, const XCons *steps){
 	ApproxCons pbuf;
+	approx_cons_init(&pbuf);
 	for(int i = 0; i < steps->len; ++i){
 		int last_len = base->points_len, n = 0;
 		Line l;
@@ -56,14 +58,14 @@ int apply_xcons(ApproxCons *base, const XCons *steps){
 		}
 		switch(type){
 		case GEOM_DEP_PPL:
-			construct_line(&l, base->points + i1, base->points + i2);
+			construct_line(&pbuf, &l, base->points + i1, base->points + i2);
 			base->lines[o1] = l;
 			if(o1 + 1 > base->lines_len){
 				base->lines_len = o1 + 1;
 			}
 			break;
 		case GEOM_DEP_PPC:
-			construct_circle(&c, base->points + i1, base->points + i2);
+			construct_circle(&pbuf, &c, base->points + i1, base->points + i2);
 			base->circles[o1] = c;
 			if(o1 + 1 > base->circles_len){
 				base->circles_len = o1 + 1;
@@ -131,18 +133,27 @@ int record_xstep(XCons *self, int i1, int i2, int o1, int o2, GeomDepType type){
 	return 1;
 }
 
-void identify_goal(XCons *self, const ApproxCons *base){
-	double min_err_c = INFINITY, min_err_r = INFINITY;
+void identify_goal(XCons *self, ApproxCons *base){
+	//min_err_c = INFINITY, min_err_r = INFINITY
+	mpfi_interv_d(base->scratch + 0, INFINITY, INFINITY);
+	mpfi_interv_d(base->scratch + 1, INFINITY, INFINITY);
 	int min_err_c_i = -1, min_err_r_i = -1;
 	for(int i = 0; i < base->points_len; ++i){
-		double err = hypot(base->goal.x - base->points[i].x, base->goal.y - base->points[i].y);
-		if(err < min_err_c){
-			min_err_c = err;
+		//err = hypot(base->goal.x - base->points[i].x, base->goal.y - base->points[i].y)
+		mpfi_sub(base->scratch + 2, base->goal.x - base->points[i].x);
+		mpfi_sub(base->scratch + 3, base->goal.y - base->points[i].y);
+		mpfi_hypot(base->scratch + 2, base->scratch + 2, base->scratch + 3);
+		//if(err < min_err_c) min_err_c = err, min_err_c_i = i
+		if(mpfr_cmp(base->scratch[2]->left, base->scratch[0]->left) < -1){
+			mpfi_set(base->scratch + 0, base->scratch + 2);
 			min_err_c_i = i;
 		}
-		err = fabs(err - base->goal.r);
-		if(err < min_err_r){
-			min_err_r = err;
+		//err = fabs(err - base->goal.r)
+		mpfi_sub(base->scratch + 2, base->scratch + 2, base->goal.r);
+		mpfi_abs(base->scratch + 2, base->scratch + 2);
+		//if(err < min_err_r) min_err_r = err, min_err_r_i = i
+		if(mpfr_cmp(base->scratch[2]->left, base->scratch[1]->left) < 0){
+			mpfi_set(base->scratch + 1, base->scratch + 2);
 			min_err_r_i = i;
 		}
 	}
@@ -152,10 +163,11 @@ void identify_goal(XCons *self, const ApproxCons *base){
 
 int record_new_line_points(XCons *self, const ApproxCons *base, int last_len){
 	for(int l = 0; l < base->lines_len - 1; ++l){
-		ApproxCons out = {};
+		ApproxCons out;
+		approx_cons_init(&out);
 		if(intersect_LL(&out, base->lines + l, base->lines + base->lines_len - 1)){
 			for(int i = last_len; i < base->points_len; ++i){
-				if(eq_points(out.points, base->points + i)){
+				if(eq_points(&out, out.points, base->points + i)){
 					if(!record_xstep(self, l, base->lines_len - 1, i, -1, GEOM_DEP_LLP)){
 						return 0;
 					}
@@ -165,13 +177,14 @@ int record_new_line_points(XCons *self, const ApproxCons *base, int last_len){
 		}
 	}
 	for(int c = 0; c < base->circles_len; ++c){
-		ApproxCons out = {};
+		ApproxCons out;
+		approx_cons_init(&out);
 		if(intersect_CL(&out, base->circles + c, base->lines + base->lines_len - 1)){
 			int o1 = -1, o2 = -1, i;
 			for(i = last_len; i < base->points_len; ++i){
-				if(o1 == -1 && eq_points(out.points, base->points + i)){
+				if(o1 == -1 && eq_points(&out, out.points, base->points + i)){
 					o1 = i;
-				}else if(out.points_len == 2 && o2 == -1 && eq_points(out.points + 1, base->points + i)){
+				}else if(out.points_len == 2 && o2 == -1 && eq_points(&out, out.points + 1, base->points + i)){
 					o2 = i;
 				}
 			}
@@ -187,13 +200,14 @@ int record_new_line_points(XCons *self, const ApproxCons *base, int last_len){
 
 int record_new_circle_points(XCons *self, const ApproxCons *base, int last_len){
 	for(int l = 0; l < base->lines_len; ++l){
-		ApproxCons out = {};
+		ApproxCons out;
+		approx_cons_init(&out);
 		if(intersect_CL(&out, base->circles + base->circles_len - 1, base->lines + l)){
 			int o1 = -1, o2 = -1, i;
 			for(i = last_len; i < base->points_len; ++i){
-				if(o1 == -1 && eq_points(out.points, base->points + i)){
+				if(o1 == -1 && eq_points(&out, out.points, base->points + i)){
 					o1 = i;
-				}else if(out.points_len == 2 && o2 == -1 && eq_points(out.points + 1, base->points + i)){
+				}else if(out.points_len == 2 && o2 == -1 && eq_points(&out, out.points + 1, base->points + i)){
 					o2 = i;
 				}
 			}
@@ -205,13 +219,14 @@ int record_new_circle_points(XCons *self, const ApproxCons *base, int last_len){
 		}
 	}
 	for(int c = 0; c < base->circles_len - 1; ++c){
-		ApproxCons out = {};
+		ApproxCons out;
+		approx_cons_init(&out);
 		if(intersect_CC(&out, base->circles + base->circles_len - 1, base->circles + c)){
 			int o1 = -1, o2 = -1, i;
 			for(i = last_len; i < base->points_len; ++i){
-				if(o1 == -1 && eq_points(out.points, base->points + i)){
+				if(o1 == -1 && eq_points(&out, out.points, base->points + i)){
 					o1 = i;
-				}else if(out.points_len == 2 && o2 == -1 && eq_points(out.points + 1, base->points + i)){
+				}else if(out.points_len == 2 && o2 == -1 && eq_points(&out, out.points + 1, base->points + i)){
 					o2 = i;
 				}
 			}
@@ -235,7 +250,7 @@ int export_construction(XCons *out, ApproxCons *base, int steps_len, const ConsS
 		}
 		switch(steps[i].type){
 		case GEOM_LINE:
-			construct_line(&l, base->points + steps[i].i, base->points + steps[i].j);
+			construct_line(base, &l, base->points + steps[i].i, base->points + steps[i].j);
 			if(!add_line_single(base, &l)){
 				return 0;
 			}
@@ -248,7 +263,7 @@ int export_construction(XCons *out, ApproxCons *base, int steps_len, const ConsS
 			}
 			break;
 		case GEOM_CIRCLE:
-			construct_circle(&c, base->points + steps[i].i, base->points + steps[i].j);
+			construct_circle(base, &c, base->points + steps[i].i, base->points + steps[i].j);
 			if(!add_circle_single(base, &c)){
 				return 0;
 			}
