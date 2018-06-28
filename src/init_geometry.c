@@ -5,7 +5,7 @@
 
 void init_geometry_222(ApproxCons *self){
 	static const Point init_points[] = {
-		{-.5, 7/sqrt(12)}, {-.5, 7/sqrt(12)},
+		{-.5, 7/sqrt(12)}, {.5, 7/sqrt(12)},
 		{0, 2/sqrt(3)}, {0, -1/sqrt(3)},
 		{-.5, 1/sqrt(12)}, {.5, 1/sqrt(12)},
 		{-1, -1/sqrt(3)}, {1, -1/sqrt(3)},
