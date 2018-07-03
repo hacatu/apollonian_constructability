@@ -44,23 +44,23 @@ int intersect_CC(ApproxCons *self, const Circle *restrict a, const Circle *restr
 }
 
 int intersect_CL(ApproxCons *self, const Circle *restrict C, const Line *restrict L){
-	double d = (L->x - C->x)*(-L->dy) +(L->y - C->y)*L->dx;
+	double d = (L->x - C->x)*(-L->dy) + (L->y - C->y)*L->dx;
 	double ox = d*-L->dy;
 	double oy = d*L->dx;
-	double a = hypot(ox, oy);
-	if(a >= C->r + EPSILON){
+	d = fabs(d);
+	if(d >= C->r + EPSILON){
 		return 0;
-	}else if(fabs(a - C->r) <= EPSILON){
+	}else if(fabs(d - C->r) <= EPSILON){
 		self->points[self->points_len++] = (Point){C->x + ox, C->y + oy};
 		return 1;
 	}//otherwise there are two intersections
-	double h = a < EPSILON ? C->r : sqrt(C->r*C->r - a*a)/a;
-	double dx = h*oy;
-	double dy = h*ox;
+	double h = d < EPSILON ? C->r : sqrt(C->r*C->r - d*d);
+	double dx = h*L->dx;
+	double dy = h*L->dy;
 	ox += C->x;
 	oy += C->y;
-	self->points[self->points_len++] = (Point){ox + dx, oy - dy};
-	self->points[self->points_len++] = (Point){ox - dx, oy + dy};
+	self->points[self->points_len++] = (Point){ox + dx, oy + dy};
+	self->points[self->points_len++] = (Point){ox - dx, oy - dy};
 	return 2;
 }
 

@@ -71,7 +71,7 @@ int test_CL2_pair(){
 		X1 = random_point(0, 0, 100, 100);
 		X2 = random_point(0, 0, 100, 100);
 		S = random_point(0, 0, 1, 1);
-	}while(eq_points(&X1, &X2) || fabs(S.x) < EPSILON);
+	}while(eq_points(&X1, &X2) || fabs(S.y) < EPSILON || fabs(S.x - 1) < EPSILON);
 	Point A = {X1.x + S.x*(X2.x - X1.x), X1.y + S.x*(X2.y - X1.y)};
 	Point B = {(X1.x + X2.x)/2 + S.y*(X1.y - X2.y), (X1.y + X2.y)/2 + S.y*(X2.x - X1.x)};
 	Line l;
