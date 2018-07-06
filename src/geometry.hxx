@@ -155,6 +155,8 @@ class ApproxCons {
 	ApproxCons(Limits &&limits);
 	ApproxCons(size_t p0, size_t l0, size_t c0, size_t n, size_t m);
 	
+	void init_topology();
+	
 	Progress getProgress();
 	void resetProgress(const Progress &progress);
 	
@@ -167,6 +169,10 @@ class ApproxCons {
 	void add_line_unchecked(Line &&a);
 	bool add_circle(Circle &&a);
 	void add_circle_unchecked(Circle &&a);
+	
+	void add_arbitrary_lseg_point(size_t seg);
+	void add_arbitrary_cseg_point(size_t seg);
+	void add_arbitrary_region_point(size_t reg);
 	
 	void remove_duplicate_points(size_t old_len, size_t start_len);
 	

@@ -84,19 +84,24 @@ ApproxCons::Progress::Progress(const ApproxCons &base) :
 ApproxCons::Step::Step(size_t i, size_t j, ApproxCons::Step::Type type) : i(i), j(j), type(type) {}
 
 ApproxCons::ApproxCons(Limits &&limits) : regions(0), limits(limits) {
-	points.reserve(this->limits.max_points());
-	lines.reserve(this->limits.max_lines());
-	circles.reserve(this->limits.max_circles());
-	line_segments.reserve(this->limits.max_lsegs());
-	circle_segments.reserve(this->limits.max_csegs());
-	p_ls_adj.reserve(this->limits.max_points());
-	p_cs_adj.reserve(this->limits.max_points());
-	ls_region_adj.reserve(this->limits.max_lsegs());
-	cs_region_adj.reserve(this->limits.max_csegs());
-	steps.reserve(this->limits.n);
+	this->points.reserve(this->limits.max_points());
+	this->lines.reserve(this->limits.max_lines());
+	this->circles.reserve(this->limits.max_circles());
+	this->line_segments.reserve(this->limits.max_lsegs());
+	this->circle_segments.reserve(this->limits.max_csegs());
+	this->p_ls_adj.reserve(this->limits.max_lsegs());
+	this->p_cs_adj.reserve(this->limits.max_csegs());
+	this->p_region_adj.reserve(this->limits.max_regions());
+	this->ls_region_adj.reserve(this->limits.max_regions());
+	this->cs_region_adj.reserve(this->limits.max_regions());
+	this->steps.reserve(this->limits.n);
 }
 
 ApproxCons::ApproxCons(size_t p0, size_t l0, size_t c0, size_t n, size_t m) : ApproxCons(ApproxCons::Limits(p0, l0, c0, n, m)) {}
+
+void ApproxCons::init_topology(){
+	p_region_adj.emplace_back(this->points.size(), true);
+}
 
 ApproxCons::Progress ApproxCons::getProgress(){
 	return Progress(*this);
@@ -109,25 +114,25 @@ void ApproxCons::resetProgress(const ApproxCons::Progress &progress){
 	this->line_segments.resize(progress.lsegs_len);
 	this->circle_segments.resize(progress.csegs_len);
 	this->regions = progress.regions;
-	this->p_ls_adj.resize(progress.points_len);
+	this->p_ls_adj.resize(progress.lsegs_len);
 	if(progress.points_len){
-		this->p_ls_adj[0].resize(progress.lsegs_len);
+		this->p_ls_adj[0].resize(progress.points_len);
 	}
-	this->p_cs_adj.resize(progress.points_len);
+	this->p_cs_adj.resize(progress.csegs_len);
 	if(progress.points_len){
-		this->p_cs_adj[0].resize(progress.csegs_len);
+		this->p_cs_adj[0].resize(progress.points_len);
 	}
-	this->p_region_adj.resize(progress.points_len);
+	this->p_region_adj.resize(progress.regions);
 	if(progress.points_len){
-		this->p_region_adj[0].resize(progress.regions);
+		this->p_region_adj[0].resize(progress.points_len);
 	}
-	this->ls_region_adj.resize(progress.lsegs_len);
+	this->ls_region_adj.resize(progress.regions);
 	if(progress.lsegs_len){
-		this->ls_region_adj[0].resize(progress.regions);
+		this->ls_region_adj[0].resize(progress.lsegs_Len);
 	}
-	this->cs_region_adj.resize(progress.csegs_len);
+	this->cs_region_adj.resize(progress.regions);
 	if(progress.csegs_len){
-		this->cs_region_adj[0].resize(progress.regions);
+		this->cs_region_adj[0].resize(progress.csegs_len);
 	}
 	this->steps.resize(progress.steps_len);
 }
@@ -241,6 +246,64 @@ void ApproxCons::add_circle_unchecked(Circle &&a){
 		remove_duplicate_points(old_len, start_len);
 	}
 	this->circles.push_back(a);
+}
+
+void ApproxCons::add_arbitrary_lseg_point(size_t seg){
+	const Point p;//TODO: actually generate a point on the segment
+	this->points.push_back(p);
+	Line::Segment &sa = this->line_segments[seg];
+	this->line_segments.emplace_back(sa.whole, p, sa.b);
+	sa.b = p;
+	const Line::Segment &sb = this->line_segments.back();
+	this->p_ls_adj.emplace_back(this->points.size());
+	this->p_ls_adj.back().reserve(this->limits.max_points());
+	for(size_t i = 0; i < this->points.size() - 1; ++i){
+		if(std::addressof(this->points[i]) == std::addressof(sb.b)){
+			this->p_ls_adj[seg][i] = false;
+			this->p_ls_adj.back()[i] = true;
+			break;
+		}
+	}
+	this->p_cs_adj[seg].back() = this->p_cs_adj.back().back() = true;
+	for(size_t i = 0; i < this->regions; ++i){
+		this->p_region_adj[i][seg] = this->ls_region_adj[i].back() = this->ls_region_adj[i][seg];
+	}
+}
+
+void ApproxCons::add_arbitrary_cseg_point(size_t seg){
+	const Point p;//TODO: actually generate a point on the segment
+	this->points.push_back(p);
+	Circle::Segment &sa = this->circle_segments[seg];
+	this->circle_segments.emplace_back(sa.whole, p, sa.b);
+	sa.b = p;
+	const Circle::Segment &sb = this->circle_segments.back();
+	this->p_cs_adj.emplace_back(this->points.size());
+	this->p_cs_adj.back().reserve(this->limits.max_points());
+	for(size_t i = 0; i < this->points.size() - 1; ++i){
+		if(std::addressof(this->points[i]) == std::addressof(sb.b)){
+			this->p_cs_adj[seg][i] = false;
+			this->p_cs_adj.back()[i] = true;
+			break;
+		}
+	}
+	this->p_cs_adj[seg].back() = this->p_cs_adj.back().back() = true;
+	for(size_t i = 0; i < this->regions; ++i){
+		this->p_region_adj[i][seg] = this->cs_region_adj[i].back() = this->cs_region_adj[i][seg];
+	}
+}
+
+void ApproxCons::add_arbitrary_region_point(size_t reg){
+	const Point p;//TODO: actually generate a point in the region
+	this->points.push_back(p);
+	for(std::vector<bool> &adj_pts : this->p_ls_adj){
+		adj_pts.push_back(false);
+	}
+	for(std::vector<bool> &adj_pts : this->p_cs_adj){
+		adj_pts.push_back(false);
+	}
+	for(size_t i = 0; i < this->p_region_adj.size(); ++i){
+		this->p_region_adj[i].push_back(i == reg);
+	}
 }
 
 void ApproxCons::remove_duplicate_points(size_t old_len, size_t start_len){

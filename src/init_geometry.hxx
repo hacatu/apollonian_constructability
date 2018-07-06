@@ -32,5 +32,29 @@ class IsoscelesFactory : ApproxConsFactory {
 	ApproxCons operator()() const;
 };
 
+class RightFactory : ApproxConsFactory {
+	public:
+	
+	const double a, b;
+	const Point c;
+	const double angle;
+	
+	RightFactory(double a, double b, Point &&c, double angle);
+	
+	ApproxCons operator()() const;
+};
+
+class ScaleneFactory : ApproxConsFactory {
+	public:
+	
+	const double a, b, c;
+	const Point p;
+	const double angle;
+	
+	ScaleneFactory(double a, double b, double c, Point &&p, double angle);
+	
+	ApproxCons operator()() const;
+};
+
 #endif
 
