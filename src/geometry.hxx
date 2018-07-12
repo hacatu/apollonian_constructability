@@ -2,80 +2,8 @@
 #define _GEOMETRY_HXX__
 
 #include <vector>
-
-#define EPSILON 5e-6
-
-class Point {
-	public:
-	double x, y;
-	Point() = default;
-	Point(const Point&) = default;
-	Point(double x, double y);
-	
-	Point &operator=(Point&&) = default;
-	
-	bool operator==(const Point &other) const;
-	const Point operator+(const Point &other) const;
-	const Point rotate(double angle, const Point &other) const;
-};
-
-class Geom {
-	public:
-	virtual bool contains(const Point &p) const = 0;
-	virtual ~Geom() = default;
-};
-
-class Circle : Geom {
-	public:
-	Point c;
-	double r;
-	Circle() = default;
-	Circle(const Circle&) = default;
-	Circle(double x, double y, double r);
-	Circle(const Point &c, double r);
-	
-	static Circle construct(const Point &a, const Point &b);
-	
-	bool contains(const Point &p) const;
-	
-	class Segment {
-		public:
-		const Circle &whole;
-		const Point &a, &b;
-		Segment(const Circle &whole, const Point &a, const Point &b);
-	};
-	
-	Segment makeSegment(const Point &a, const Point &b) const;
-	
-	Circle &operator=(Circle&&) = default;
-	
-	bool operator==(const Circle &other) const;
-};
-
-class Line : Geom {
-	public:
-	Point p;
-	double dx, dy;
-	Line() = default;
-	Line(const Line&) = default;
-	Line(double x, double y, double dx, double dy);
-	Line(const Point &p, double dx, double dy);
-	
-	static Line construct(const Point &a, const Point &b);
-	
-	bool contains(const Point &p) const;
-	
-	class Segment {
-		public:
-		const Line &whole;
-		const Point &a, &b;
-		Segment(const Line &whole, const Point &a, const Point &b);
-	};
-	
-	Segment makeSegment(const Point &a, const Point &b) const;
-	
-	bool operator==(const Line &other) const;
-};
+#include "primitives.hxx"
+#include "topology.hxx"
 
 class ApproxCons {
 	public:
@@ -140,8 +68,8 @@ class ApproxCons {
 	std::vector<Point> points;
 	std::vector<Line> lines;
 	std::vector<Circle> circles;
-	std::vector<std::vector<Line::Segment>> line_segments;
-	std::vector<std::vector<Circle::Segment>> circle_segments;
+	//std::vector<Line::Segment> line_segments;
+	//std::vector<Circle::Segment> circle_segments;
 	size_t regions;
 	std::vector<std::vector<bool>> p_ls_adj;
 	std::vector<std::vector<bool>> p_cs_adj;
@@ -178,6 +106,55 @@ class ApproxCons {
 	
 	void record_step(Step &&step);
 };
+
+std::vector<Point> intersect(const Line &a, const Line &b);
+std::vector<Point> intersect(const Circle &a, const Line &b);
+
+inline std::vector<Point> intersect(const Line &a, const Circle &b){
+	return intersect(b, a);
+}
+
+std::vector<Point> intersect(const Circle &a, const Circle &b);
+
+inline std::vector<Point> intersect(const Geom &a, const Geom &b){
+	if(typeid(a) == typeid(const Line&)){
+		if(typeid(b) == typeid(const Line&)){
+			return intersect(static_cast<const Line&>(a), static_cast<const Line&>(b));
+		}
+		return intersect(static_cast<const Line&>(a), static_cast<const Circle&>(b));
+	}else if(typeid(b) == typeid(const Line&)){
+		return intersect(static_cast<const Circle&>(a), static_cast<const Line&>(b));
+	}
+	return intersect(static_cast<const Circle&>(a), static_cast<const Circle&>(b));
+}
+
+inline std::vector<Point> intersect(const Line &a, const Geom &b){
+	if(typeid(b) == typeid(const Line&)){
+		return intersect(a, static_cast<const Line&>(b));
+	}
+	return intersect(a, static_cast<const Circle&>(b));
+}
+
+inline std::vector<Point> intersect(const Circle &a, const Geom &b){
+	if(typeid(b) == typeid(const Line&)){
+		return intersect(a, static_cast<const Line&>(b));
+	}
+	return intersect(a, static_cast<const Circle&>(b));
+}
+
+inline std::vector<Point> intersect(const Geom &a, const Line &b){
+	if(typeid(a) == typeid(const Line&)){
+		return intersect(static_cast<const Line&>(a), b);
+	}
+	return intersect(static_cast<const Circle&>(a), b);
+}
+
+inline std::vector<Point> intersect(const Geom &a, const Circle &b){
+	if(typeid(a) == typeid(const Line&)){
+		return intersect(static_cast<const Line&>(a), b);
+	}
+	return intersect(static_cast<const Circle&>(a), b);
+}
 
 #endif
 

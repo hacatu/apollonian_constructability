@@ -1,15 +1,15 @@
 CCXX := clang++
 LDXX := clang++
 ARXX := ar
-CXXFLAGS_RELEASE := -Wall -std=c++17 -Isrc -Ofast -ffast-math -mtune=native -march=native
-#CXXFLAGS_RELEASE := -Wall -std=c++17 -Isrc -g -pthread
+CXXFLAGS_RELEASE := -Wall -Wno-switch -std=c++17 -Isrc -Ofast -ffast-math -mtune=native -march=native
+#CXXFLAGS_RELEASE := -Wall -Wno-switch -std=c++17 -Isrc -g -pthread
 LDXXFLAGS_RELEASE := -Ofast -ffast-math -mtune=native -march=native -flto -fuse-ld=gold -lm -lSDL2 -lSDL2_gfx
 #LDXXFLAGS_RELEASE := -g -flto -fuse-ld=gold -lm -lSDL2 -lSDL2_gfx
-#CXXFLAGS_DEBUG := -Wall -std=c++17 -Ofast -ffast-math -mtune=native -march=native
-CXXFLAGS_DEBUG := -Wall -std=c++17 -g3 --coverage
+#CXXFLAGS_DEBUG := -Wall -Wno-switch -std=c++17 -Ofast -ffast-math -mtune=native -march=native
+CXXFLAGS_DEBUG := -Wall -Wno-switch -std=c++17 -g3 --coverage
 #LDXXFLAGS_DEBUG := -Ofast -ffast-math -mtune=native -march=native -flto -fuse-ld=gold -lm
 LDXXFLAGS_DEBUG := --coverage -lm
-TEST_CXXFLAGS := -Wall -std=c++17 -g3 -Isrc
+TEST_CXXFLAGS := -Wall -Wno-switch -std=c++17 -g3 -Isrc
 TEST_LDXXFLAGS := --coverage -lm
 BUILD_ROOT := $(shell pwd)
 SOURCES_XX := $(shell find src -maxdepth 1 -name '*.cxx')

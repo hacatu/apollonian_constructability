@@ -8,7 +8,7 @@ class ApproxConsFactory {
 	virtual ApproxCons operator()() const = 0;
 };
 
-class EquilateralFactory : ApproxConsFactory {
+class EquilateralFactory : public ApproxConsFactory {
 	public:
 	
 	const double side;
@@ -20,7 +20,7 @@ class EquilateralFactory : ApproxConsFactory {
 	ApproxCons operator()() const;
 };
 
-class IsoscelesFactory : ApproxConsFactory {
+class IsoscelesFactory : public ApproxConsFactory {
 	public:
 	
 	const double side, base;
@@ -32,7 +32,7 @@ class IsoscelesFactory : ApproxConsFactory {
 	ApproxCons operator()() const;
 };
 
-class RightFactory : ApproxConsFactory {
+class RightFactory : public ApproxConsFactory {
 	public:
 	
 	const double a, b;
@@ -44,7 +44,7 @@ class RightFactory : ApproxConsFactory {
 	ApproxCons operator()() const;
 };
 
-class ScaleneFactory : ApproxConsFactory {
+class ScaleneFactory : public ApproxConsFactory {
 	public:
 	
 	const double a, b, c;

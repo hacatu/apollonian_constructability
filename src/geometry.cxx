@@ -1,77 +1,9 @@
 #include <cmath>
 #include <vector>
+#include <array>
 #include <algorithm>
 #include <stdexcept>
 #include "geometry.hxx"
-
-Point::Point(double x, double y) : x(x), y(y) {}
-
-bool Point::operator==(const Point &other) const {
-	double dx = other.x - this->x;
-	double dy = other.y - this->y;
-	return dx*dx + dy*dy < EPSILON;
-}
-
-const Point Point::operator+(const Point &other) const {
-	return Point(this->x + other.x, this->y + other.y);
-}
-
-const Point Point::rotate(double angle, const Point &other) const {
-	double x = other.x - this->x;
-	double y = other.y - this->y;
-	return Point(this->x + x*std::cos(angle) - y*std::sin(angle),
-		this->y + x*std::sin(angle) + y*std::cos(angle));
-}
-
-Circle::Circle(double x, double y, double r) : c(x, y), r(r) {}
-Circle::Circle(const Point &c, double r) : c(c), r(r) {}
-
-Circle Circle::construct(const Point &a, const Point &b){
-	return Circle(a, std::hypot(b.x - a.x, b.y - a.y));
-}
-
-bool Circle::contains(const Point &p) const {
-	return std::fabs(std::hypot(p.x - c.x, p.y - c.y) - r) < EPSILON;
-}
-
-Circle::Segment::Segment(const Circle &whole, const Point &a, const Point &b) : whole(whole), a(a), b(b) {}
-
-Circle::Segment Circle::makeSegment(const Point &a, const Point &b) const {
-	return Circle::Segment(*this, a, b);
-}
-
-bool Circle::operator==(const Circle &other) const {
-	return this->c == other.c && std::fabs(other.r - this->r) < EPSILON;
-}
-
-Line::Line(double x, double y, double dx, double dy) : p(x, y), dx(dx), dy(dy) {}
-Line::Line(const Point &p, double dx, double dy) : p(p), dx(dx), dy(dy) {}
-
-Line Line::construct(const Point &a, const Point &b){
-	double dx = b.x - a.x;
-	double dy = b.y - a.y;
-	double h = std::hypot(dx, dy);
-	return Line(a, dx/h, dy/h);
-}
-
-bool Line::contains(const Point &p) const {
-	return std::fabs((p.x - this->p.x)*-dy + (p.y - this->p.y)*dx) < EPSILON;
-}
-
-Line::Segment::Segment(const Line &whole, const Point &a, const Point &b) : whole(whole), a(a), b(b) {}
-
-Line::Segment Line::makeSegment(const Point &a, const Point &b) const {
-	return Line::Segment(*this, a, b);
-}
-
-bool Line::operator==(const Line &other) const {
-	if(std::fabs(this->dx*other.dx + this->dy*other.dy) < 1 - EPSILON){
-		return false;
-	}
-	double dx = other.p.x - this->p.x;
-	double dy = other.p.y - this->p.y;
-	return std::fabs(dx*-this->dy + dy*other.dx) < EPSILON;
-}
 
 ApproxCons::Progress::Progress(size_t points_len, size_t lines_len, size_t circles_len, size_t lsegs_len, size_t csegs_len, size_t regions, size_t steps_len) :
 	points_len(points_len), lines_len(lines_len), circles_len(circles_len), lsegs_len(lsegs_len), csegs_len(csegs_len), regions(regions), steps_len(steps_len)
@@ -101,6 +33,7 @@ ApproxCons::ApproxCons(size_t p0, size_t l0, size_t c0, size_t n, size_t m) : Ap
 
 void ApproxCons::init_topology(){
 	p_region_adj.emplace_back(this->points.size(), true);
+	this->regions = 1;
 }
 
 ApproxCons::Progress ApproxCons::getProgress(){
@@ -128,78 +61,13 @@ void ApproxCons::resetProgress(const ApproxCons::Progress &progress){
 	}
 	this->ls_region_adj.resize(progress.regions);
 	if(progress.lsegs_len){
-		this->ls_region_adj[0].resize(progress.lsegs_Len);
+		this->ls_region_adj[0].resize(progress.lsegs_len);
 	}
 	this->cs_region_adj.resize(progress.regions);
 	if(progress.csegs_len){
 		this->cs_region_adj[0].resize(progress.csegs_len);
 	}
 	this->steps.resize(progress.steps_len);
-}
-
-int ApproxCons::intersect(const Line &a, const Line &b){
-	double daxdb = a.dx*b.dy - a.dy*b.dx;
-	if(std::fabs(daxdb) < EPSILON){
-		return 0;
-	}
-	double ambx = a.p.x - b.p.x;
-	double amby = a.p.y - b.p.y;
-	double t = (amby*b.dx - ambx*b.dy)/daxdb;
-	this->points.emplace_back(a.p.x + t*a.dx, a.p.y + t*a.dy);
-	return 1;
-}
-
-int ApproxCons::intersect(const Circle &c, const Line &l){
-	double d = (l.p.x - c.c.x)*(-l.dy) + (l.p.y - c.c.y)*l.dx;
-	double ox = d*-l.dy;
-	double oy = d*l.dx;
-	d = std::fabs(d);
-	if(d >= c.r + EPSILON){
-		return 0;
-	}else if(std::fabs(d - c.r) <= EPSILON){
-		this->points.emplace_back(c.c.x + ox, c.c.y + oy);
-		return 1;
-	}//otherwise there are two intersections
-	double h = d < EPSILON ? c.r : std::sqrt(c.r*c.r - d*d);
-	double dx = h*l.dx;
-	double dy = h*l.dy;
-	ox += c.c.x;
-	oy += c.c.y;
-	this->points.emplace_back(ox + dx, oy + dy);
-	this->points.emplace_back(ox - dx, oy - dy);
-	return 2;
-}
-
-inline int ApproxCons::intersect(const Line &a, const Circle &b){
-	return intersect(b, a);
-}
-
-int ApproxCons::intersect(const Circle &a, const Circle &b){
-	double d = std::hypot(b.c.x - a.c.x, b.c.y - a.c.y);
-	if(d >= a.r + b.r + EPSILON || d <= std::fabs(b.r - a.r) - EPSILON){
-		return 0;
-	}
-	double dx = b.c.y - a.c.y;
-	double dy = b.c.x - a.c.x;
-	if(std::fabs(a.r + b.r - d) <= EPSILON || std::fabs(std::fabs(b.r - a.r) - d) <= EPSILON){//there is only one intersection
-		if(a.r <= b.r && d < b.r + a.r - EPSILON){
-			d = -d;
-		}
-		d = a.r/d;
-		this->points.emplace_back(a.c.x + d*dx, a.c.y + d*dy);
-		return 1;
-	}//otherwise there are two intersections
-	double al = (a.r*a.r - b.r*b.r + d*d)/(2*d);
-	double h = std::sqrt(a.r*a.r - al*al);
-	al /= d;
-	h /= d;
-	double x = a.c.x + al*dy;
-	double y = a.c.y + al*dx;
-	dx *= h;
-	dy *= h;
-	this->points.emplace_back(x + dx, y - dy);
-	this->points.emplace_back(x - dx, y + dy);
-	return 2;
 }
 
 bool ApproxCons::add_line(Line &&a){
@@ -249,16 +117,16 @@ void ApproxCons::add_circle_unchecked(Circle &&a){
 }
 
 void ApproxCons::add_arbitrary_lseg_point(size_t seg){
-	const Point p;//TODO: actually generate a point on the segment
-	this->points.push_back(p);
 	Line::Segment &sa = this->line_segments[seg];
-	this->line_segments.emplace_back(sa.whole, p, sa.b);
-	sa.b = p;
+	const Point p = sa.a->unit_combination(std::cbrt(.25), *sa.b);
+	this->points.push_back(p);
+	this->line_segments.emplace_back(*sa.whole, this->points.back(), *sa.b);
+	sa.b = std::addressof(this->points.back());
 	const Line::Segment &sb = this->line_segments.back();
 	this->p_ls_adj.emplace_back(this->points.size());
 	this->p_ls_adj.back().reserve(this->limits.max_points());
 	for(size_t i = 0; i < this->points.size() - 1; ++i){
-		if(std::addressof(this->points[i]) == std::addressof(sb.b)){
+		if(std::addressof(this->points[i]) == sb.b){
 			this->p_ls_adj[seg][i] = false;
 			this->p_ls_adj.back()[i] = true;
 			break;
@@ -271,16 +139,20 @@ void ApproxCons::add_arbitrary_lseg_point(size_t seg){
 }
 
 void ApproxCons::add_arbitrary_cseg_point(size_t seg){
-	const Point p;//TODO: actually generate a point on the segment
-	this->points.push_back(p);
 	Circle::Segment &sa = this->circle_segments[seg];
-	this->circle_segments.emplace_back(sa.whole, p, sa.b);
-	sa.b = p;
+	double angle = std::asin((*sa.a - sa.whole->c).cross(*sa.b - sa.whole->c)/(sa.whole->r*sa.whole->r));
+	if(angle < EPSILON){
+		angle = M_2_PI;
+	}
+	const Point p = sa.whole->c.rotate(angle/3, *sa.a);
+	this->points.push_back(p);
+	this->circle_segments.emplace_back(*sa.whole, this->points.back(), *sa.b);
+	sa.b = std::addressof(this->points.back());
 	const Circle::Segment &sb = this->circle_segments.back();
 	this->p_cs_adj.emplace_back(this->points.size());
 	this->p_cs_adj.back().reserve(this->limits.max_points());
 	for(size_t i = 0; i < this->points.size() - 1; ++i){
-		if(std::addressof(this->points[i]) == std::addressof(sb.b)){
+		if(std::addressof(this->points[i]) == sb.b){
 			this->p_cs_adj[seg][i] = false;
 			this->p_cs_adj.back()[i] = true;
 			break;
@@ -293,7 +165,28 @@ void ApproxCons::add_arbitrary_cseg_point(size_t seg){
 }
 
 void ApproxCons::add_arbitrary_region_point(size_t reg){
-	const Point p;//TODO: actually generate a point in the region
+	auto ait = std::find(this->cs_region_adj[reg].begin(), this->cs_region_adj[reg].end(), true);
+	Point p;
+	if(ait == this->cs_region_adj[reg].end()){
+		auto begin = this->p_region_adj[reg].begin(), end = this->p_region_adj[reg].end(), pit = begin;
+		const Point &ps[3];
+		for(size_t i = 0; i < 3; ++i){
+			pit = std::find(pit, end, true);
+			ps[i] = this->points[pit++ - begin];
+		}
+		double t = (1 - std::cbrt(.25))/2;
+		p = ps->unit_combination(t, ps[1], t, ps[2]);
+	}else{//so we really need to cache some data about each region because this isn't going to be efficient
+		//namely I think adjacency lists would be better than adjacency matrices since they obviate searching
+		//and make the order of neighbors obvious.  For regions, it would be best to know some stuff like
+		//an arbitrary point in them.  For convex regions, we can just take a linear combination of the corners
+		//with manhattan norm one, but for concave regions things get dumb.  One solution is to store a diameter
+		//of one of the circles which is a third of the way around some concave arc, find the first of its
+		//intersections with the other boundary shapes projected onto it, and pick the point cbrt(.25) between
+		//them.  There's a small problem though: I can't immediately tell which side of the arc is the inside.
+		//
+		
+	}
 	this->points.push_back(p);
 	for(std::vector<bool> &adj_pts : this->p_ls_adj){
 		adj_pts.push_back(false);
@@ -318,5 +211,51 @@ void ApproxCons::remove_duplicate_points(size_t old_len, size_t start_len){
 
 void ApproxCons::record_step(Step &&step){
 	this->steps.push_back(step);
+}
+
+std::vector<Point> intersect(const Line &a, const Line &b){
+	double daxdb = a.d.cross(b.d);
+	if(std::fabs(daxdb) < EPSILON){
+		return std::vector{};
+	}
+	double t = b.d.cross(a - b)/daxdb;
+	return std::vector{a.p + t*a.d};
+}
+
+std::vector<Point> intersect(const Circle &a, const Line &b){
+	double d = (l.p - c.c)*l.d.ccw();
+	Point o = d*l.d.ccw();
+	d = std::fabs(d);
+	if(d >= c.r + EPSILON){
+		return std::vector{};
+	}else if(std::fabs(d - c.r) <= EPSILON){
+		return std::vector{c.c + o};
+	}//otherwise there are two intersections
+	double h = d < EPSILON ? c.r : std::sqrt(c.r*c.r - d*d);
+	const Point f = h*l.d;
+	o = o + c.c;
+	return std::vector{o + f, o - f};
+}
+
+std::vector<Point> intersect(const Circle &a, const Circle &b){
+	double d = b.c.distance(a.c);
+	if(d >= a.r + b.r + EPSILON || d <= std::fabs(b.r - a.r) - EPSILON){
+		return std::vector{};
+	}
+	Point f = (b.c - a.c).transpose();
+	if(std::fabs(a.r + b.r - d) <= EPSILON || std::fabs(std::fabs(b.r - a.r) - d) <= EPSILON){//there is only one intersection
+		if(a.r <= b.r && d < b.r + a.r - EPSILON){
+			d = -d;
+		}
+		d = a.r/d;
+		return std::vector{a.c + d*f};
+	}//otherwise there are two intersections
+	double al = (a.r*a.r - b.r*b.r + d*d)/(2*d);
+	double h = std::sqrt(a.r*a.r - al*al);
+	al /= d;
+	h /= d;
+	const Point o = a.c + al*f.transpose();
+	f = h*f;
+	return std::vector{o + f, o - f};
 }
 
